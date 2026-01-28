@@ -1,0 +1,23 @@
+{
+  "name": "faas-qa-automation",
+  "version": "1.0.0",
+  "description": "Centralized QA automation for FAAS platform",
+  "scripts": {
+    "test": "playwright test",
+    "test:debug": "playwright test --debug",
+    "test:ui": "playwright test --ui",
+    "test:headed": "playwright test --headed"
+  },
+  "keywords": [
+    "qa",
+    "testing",
+    "playwright",
+    "automation"
+  ],
+  "author": "FAAS QA Team",
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "@playwright/test": "^1.40.0",
+    "@types/node": "^20.0.0"
+  }
+}

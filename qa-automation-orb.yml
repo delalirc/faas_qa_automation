@@ -1,0 +1,258 @@
+version: 2.1
+
+description: |
+  Centralized QA Test Execution Orb
+  Allows services to trigger centralized QA tests during deployment pipelines.
+
+orbs:
+  # No dependencies
+
+executors:
+  default:
+    docker:
+      - image: cimg/python:3.10
+
+commands:
+  trigger_qa_tests:
+    description: "Trigger centralized QA tests for a service"
+    parameters:
+      service:
+        type: string
+        description: "Service name (e.g., 'offer', 'contract')"
+      test_suite:
+        type: string
+        default: "integration"
+        description: "Test suite to run ('integration', 'e2e', 'smoke', 'financial')"
+      environment:
+        type: string
+        default: "dev"
+        description: "Target environment ('dev', 'uat', 'prod')"
+      qa_repo:
+        type: string
+        default: "gh/retail-capital/faas_qa_automation"
+        description: "CircleCI project slug for QA repository"
+    steps:
+      - run:
+          name: Trigger QA Tests for << parameters.service >>
+          command: |
+            if [ -z "$CIRCLECI_API_TOKEN" ]; then
+              echo "ERROR: CIRCLECI_API_TOKEN is not set"
+              exit 1
+            fi
+            
+            PAYLOAD=$(cat <<EOF
+            {
+              "parameters": {
+                "service": "<< parameters.service >>",
+                "test_suite": "<< parameters.test_suite >>",
+                "environment": "<< parameters.environment >>",
+                "triggered_by": "${CIRCLE_PROJECT_REPONAME}",
+                "build_num": "${CIRCLE_BUILD_NUM}",
+                "commit_sha": "${CIRCLE_SHA1}"
+              }
+            }
+            EOF
+            )
+            
+            echo "Triggering QA tests..."
+            echo "Service: << parameters.service >>"
+            echo "Test Suite: << parameters.test_suite >>"
+            echo "Environment: << parameters.environment >>"
+            
+            RESPONSE=$(curl -s -X POST \
+              -H "Circle-Token: $CIRCLECI_API_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "$PAYLOAD" \
+              "https://circleci.com/api/v2/project/<< parameters.qa_repo >>/pipeline")
+            
+            PIPELINE_ID=$(echo "$RESPONSE" | jq -r '.id // empty')
+            
+            if [ -z "$PIPELINE_ID" ] || [ "$PIPELINE_ID" = "null" ]; then
+              echo "ERROR: Failed to trigger QA tests"
+              echo "Response: $RESPONSE"
+              exit 1
+            fi
+            
+            echo "QA pipeline triggered: $PIPELINE_ID"
+            echo "Pipeline URL: https://app.circleci.com/pipelines/<< parameters.qa_repo >>/$PIPELINE_ID"
+            echo "PIPELINE_ID=$PIPELINE_ID" >> $BASH_ENV
+
+  wait_for_qa_tests:
+    description: "Wait for QA tests to complete"
+    parameters:
+      service:
+        type: string
+        description: "Service name"
+      build_num:
+        type: string
+        description: "Build number"
+      timeout:
+        type: integer
+        default: 1800
+        description: "Timeout in seconds (default: 1800 = 30 minutes)"
+      qa_repo:
+        type: string
+        default: "gh/retail-capital/faas_qa_automation"
+        description: "CircleCI project slug for QA repository"
+    steps:
+      - checkout:
+          path: ~/qa-automation
+      - run:
+          name: Wait for QA Tests
+          command: |
+            cd ~/qa-automation
+            python scripts/wait_for_qa_tests.py \
+              --service << parameters.service >> \
+              --build-num << parameters.build_num >> \
+              --timeout << parameters.timeout >>
+
+  check_qa_results:
+    description: "Check QA test results and fail if tests failed"
+    parameters:
+      service:
+        type: string
+        description: "Service name"
+      build_num:
+        type: string
+        description: "Build number"
+      fail_on_failure:
+        type: boolean
+        default: true
+        description: "Exit with error if tests failed"
+    steps:
+      - checkout:
+          path: ~/qa-automation
+      - run:
+          name: Check QA Test Results
+          command: |
+            cd ~/qa-automation
+            python scripts/check_qa_results.py \
+              --service << parameters.service >> \
+              --build-num << parameters.build_num >> \
+              --fail-on-failure << parameters.fail_on_failure >>
+
+jobs:
+  run_service_tests:
+    description: "Run integration tests for a service"
+    executor: default
+    parameters:
+      service:
+        type: string
+        description: "Service name"
+      test_suite:
+        type: string
+        default: "integration"
+        description: "Test suite"
+      environment:
+        type: string
+        default: "dev"
+        description: "Environment"
+    steps:
+      - trigger_qa_tests:
+          service: << parameters.service >>
+          test_suite: << parameters.test_suite >>
+          environment: << parameters.environment >>
+      - wait_for_qa_tests:
+          service: << parameters.service >>
+          build_num: ${CIRCLE_BUILD_NUM}
+      - check_qa_results:
+          service: << parameters.service >>
+          build_num: ${CIRCLE_BUILD_NUM}
+          fail_on_failure: true
+
+  run_service_e2e:
+    description: "Run E2E tests for a service"
+    executor: default
+    parameters:
+      service:
+        type: string
+        description: "Service name"
+      environment:
+        type: string
+        default: "dev"
+        description: "Environment"
+    steps:
+      - trigger_qa_tests:
+          service: << parameters.service >>
+          test_suite: "e2e"
+          environment: << parameters.environment >>
+      - wait_for_qa_tests:
+          service: << parameters.service >>
+          build_num: ${CIRCLE_BUILD_NUM}
+      - check_qa_results:
+          service: << parameters.service >>
+          build_num: ${CIRCLE_BUILD_NUM}
+          fail_on_failure: true
+
+  run_service_financial:
+    description: "Run financial tests for a service"
+    executor: default
+    parameters:
+      service:
+        type: string
+        description: "Service name"
+      environment:
+        type: string
+        default: "dev"
+        description: "Environment"
+    steps:
+      - trigger_qa_tests:
+          service: << parameters.service >>
+          test_suite: "financial"
+          environment: << parameters.environment >>
+      - wait_for_qa_tests:
+          service: << parameters.service >>
+          build_num: ${CIRCLE_BUILD_NUM}
+      - check_qa_results:
+          service: << parameters.service >>
+          build_num: ${CIRCLE_BUILD_NUM}
+          fail_on_failure: true
+
+  run_smoke_tests:
+    description: "Run smoke tests after deployment"
+    executor: default
+    parameters:
+      service:
+        type: string
+        description: "Service name"
+      environment:
+        type: string
+        default: "dev"
+        description: "Environment"
+    steps:
+      - trigger_qa_tests:
+          service: << parameters.service >>
+          test_suite: "smoke"
+          environment: << parameters.environment >>
+      - wait_for_qa_tests:
+          service: << parameters.service >>
+          build_num: ${CIRCLE_BUILD_NUM}
+          timeout: 600
+      - check_qa_results:
+          service: << parameters.service >>
+          build_num: ${CIRCLE_BUILD_NUM}
+          fail_on_failure: false
+
+  run_journey_tests:
+    description: "Run cross-service journey tests"
+    executor: default
+    parameters:
+      journey:
+        type: string
+        description: "Journey name (e.g., 'offer-to-contract')"
+      environment:
+        type: string
+        default: "dev"
+        description: "Environment"
+    steps:
+      - trigger_qa_tests:
+          service: ""
+          test_suite: "journey"
+          environment: << parameters.environment >>
+      - wait_for_qa_tests:
+          service: ""
+          build_num: ${CIRCLE_BUILD_NUM}
+      - check_qa_results:
+          service: ""
+          build_num: ${CIRCLE_BUILD_NUM}
+          fail_on_failure: true

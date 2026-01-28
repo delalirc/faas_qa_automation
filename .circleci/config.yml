@@ -1,0 +1,295 @@
+version: 2.1
+
+parameters:
+  service:
+    type: string
+    default: ""
+  test_suite:
+    type: string
+    default: "integration"
+  environment:
+    type: string
+    default: "dev"
+  triggered_by:
+    type: string
+    default: ""
+  build_num:
+    type: string
+    default: ""
+  commit_sha:
+    type: string
+    default: ""
+
+jobs:
+  # Integration Tests
+  run_integration_tests:
+    docker:
+      - image: cimg/python:3.10
+    parameters:
+      service:
+        type: string
+      environment:
+        type: string
+      triggered_by:
+        type: string
+        default: ""
+      build_num:
+        type: string
+        default: ""
+    steps:
+      - checkout
+      - run:
+          name: Install Dependencies
+          command: |
+            python -m pip install --upgrade pip
+            pip install -r requirements.txt
+      - run:
+          name: Create Test Results Directory
+          command: mkdir -p test-results
+      - run:
+          name: Run Integration Tests
+          command: |
+            if [ -n "<< parameters.service >>" ]; then
+              pytest tests/services/<< parameters.service >>/integration/ \
+                -m integration \
+                --junitxml=test-results/integration.xml \
+                --html=test-results/integration.html \
+                --self-contained-html \
+                -v
+            else
+              pytest tests/services/ -m integration \
+                --junitxml=test-results/integration.xml \
+                --html=test-results/integration.html \
+                --self-contained-html \
+                -v
+            fi
+          environment:
+            BASE_URL: https://<< parameters.environment >>.api.rcdevops.co.za
+            AUTH_TOKEN: ${AUTH_TOKEN}
+      - store_test_results:
+          path: test-results
+      - store_artifacts:
+          path: test-results
+      - run:
+          name: Publish Results
+          command: |
+            if [ -f test-results/integration.xml ]; then
+              python framework/utils/reporting.py \
+                --service << parameters.service >> \
+                --environment << parameters.environment >> \
+                --results test-results/integration.xml \
+                --triggered-by << parameters.triggered_by >> \
+                --build-num << parameters.build_num >> \
+                --slack || true
+            fi
+
+  # Financial Tests
+  run_financial_tests:
+    docker:
+      - image: cimg/python:3.10
+    parameters:
+      service:
+        type: string
+      environment:
+        type: string
+    steps:
+      - checkout
+      - run:
+          name: Install Dependencies
+          command: |
+            python -m pip install --upgrade pip
+            pip install -r requirements.txt
+      - run:
+          name: Create Test Results Directory
+          command: mkdir -p test-results
+      - run:
+          name: Run Financial Tests
+          command: |
+            if [ -n "<< parameters.service >>" ]; then
+              pytest tests/services/<< parameters.service >>/integration/ \
+                -m financial \
+                --junitxml=test-results/financial.xml \
+                --html=test-results/financial.html \
+                --self-contained-html \
+                -v
+            else
+              pytest tests/services/ -m financial \
+                --junitxml=test-results/financial.xml \
+                --html=test-results/financial.html \
+                --self-contained-html \
+                -v
+            fi
+          environment:
+            BASE_URL: https://<< parameters.environment >>.api.rcdevops.co.za
+            AUTH_TOKEN: ${AUTH_TOKEN}
+      - store_test_results:
+          path: test-results
+      - store_artifacts:
+          path: test-results
+
+  # E2E Tests (Playwright)
+  run_e2e_tests:
+    docker:
+      - image: mcr.microsoft.com/playwright:v1.40.0-focal
+    parameters:
+      service:
+        type: string
+      environment:
+        type: string
+    steps:
+      - checkout
+      - run:
+          name: Install Dependencies
+          command: |
+            npm ci
+            npx playwright install --with-deps
+      - run:
+          name: Create Test Results Directory
+          command: mkdir -p test-results
+      - run:
+          name: Run E2E Tests
+          command: |
+            if [ -n "<< parameters.service >>" ]; then
+              npx playwright test tests/services/<< parameters.service >>/e2e/ \
+                --reporter=json,junit \
+                --output=test-results || true
+            else
+              npx playwright test tests/services/ \
+                --reporter=json,junit \
+                --output=test-results || true
+            fi
+          environment:
+            BASE_URL: https://<< parameters.environment >>.api.rcdevops.co.za
+            AUTH_TOKEN: ${AUTH_TOKEN}
+      - store_test_results:
+          path: test-results
+      - store_artifacts:
+          path: test-results
+          destination: playwright-results
+      - store_artifacts:
+          path: playwright-report
+          destination: playwright-report
+
+  # Journey Tests
+  run_journey_tests:
+    docker:
+      - image: mcr.microsoft.com/playwright:v1.40.0-focal
+    parameters:
+      journey:
+        type: string
+      environment:
+        type: string
+    steps:
+      - checkout
+      - run:
+          name: Install Dependencies
+          command: |
+            npm ci
+            npx playwright install --with-deps
+      - run:
+          name: Create Test Results Directory
+          command: mkdir -p test-results
+      - run:
+          name: Run Journey Tests
+          command: |
+            if [ -n "<< parameters.journey >>" ]; then
+              npx playwright test tests/journeys/<< parameters.journey >>.spec.ts \
+                --reporter=json,junit \
+                --output=test-results || true
+            else
+              npx playwright test tests/journeys/ \
+                --reporter=json,junit \
+                --output=test-results || true
+            fi
+          environment:
+            BASE_URL: https://<< parameters.environment >>.api.rcdevops.co.za
+            AUTH_TOKEN: ${AUTH_TOKEN}
+      - store_test_results:
+          path: test-results
+      - store_artifacts:
+          path: test-results
+
+  # Smoke Tests
+  run_smoke_tests:
+    docker:
+      - image: cimg/python:3.10
+    parameters:
+      service:
+        type: string
+      environment:
+        type: string
+    steps:
+      - checkout
+      - run:
+          name: Install Dependencies
+          command: |
+            python -m pip install --upgrade pip
+            pip install -r requirements.txt
+      - run:
+          name: Create Test Results Directory
+          command: mkdir -p test-results
+      - run:
+          name: Run Smoke Tests
+          command: |
+            if [ -n "<< parameters.service >>" ]; then
+              pytest tests/services/<< parameters.service >>/ \
+                -m smoke \
+                --junitxml=test-results/smoke.xml \
+                --html=test-results/smoke.html \
+                --self-contained-html \
+                -v
+            else
+              pytest tests/smoke/ \
+                -m smoke \
+                --junitxml=test-results/smoke.xml \
+                --html=test-results/smoke.html \
+                --self-contained-html \
+                -v
+            fi
+          environment:
+            BASE_URL: https://<< parameters.environment >>.api.rcdevops.co.za
+            AUTH_TOKEN: ${AUTH_TOKEN}
+      - store_test_results:
+          path: test-results
+      - store_artifacts:
+          path: test-results
+
+workflows:
+  # Triggered by service pipelines
+  service-tests:
+    when:
+      and:
+        - not:
+            equal: [<< pipeline.parameters.triggered_by >>, ""]
+    jobs:
+      - run_integration_tests:
+          service: << pipeline.parameters.service >>
+          environment: << pipeline.parameters.environment >>
+          triggered_by: << pipeline.parameters.triggered_by >>
+          build_num: << pipeline.parameters.build_num >>
+      - run_financial_tests:
+          service: << pipeline.parameters.service >>
+          environment: << pipeline.parameters.environment >>
+          requires: [run_integration_tests]
+      - run_e2e_tests:
+          service: << pipeline.parameters.service >>
+          environment: << pipeline.parameters.environment >>
+          requires: [run_financial_tests]
+  
+  # QA team workflow (for maintaining tests)
+  qa-maintenance:
+    when:
+      equal: [<< pipeline.parameters.triggered_by >>, ""]
+    jobs:
+      - run_integration_tests:
+          service: ""
+          environment: "dev"
+      - run_financial_tests:
+          service: ""
+          environment: "dev"
+      - run_e2e_tests:
+          service: ""
+          environment: "dev"
+      - run_smoke_tests:
+          service: ""
+          environment: "dev"
