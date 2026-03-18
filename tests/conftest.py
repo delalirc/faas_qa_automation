@@ -4,7 +4,6 @@ Shared pytest configuration and fixtures for FAAS QA tests
 
 import pytest
 import os
-from framework.api.client import OfferClient, IntegrationClient
 from framework.api.auth import get_test_token
 
 
@@ -15,29 +14,15 @@ def base_url() -> str:
 
 
 @pytest.fixture(scope="session")
-def auth_token() -> str | None:
+def auth_token() -> str:
     """Authentication token for API testing"""
     try:
         return str(get_test_token())
     except ValueError as e:
         print(f"No authentication token available: {e}")
         pytest.skip("No authentication token available")
-    return None
 
 
-@pytest.fixture
-def offer_client(base_url: str, auth_token: str | None) -> OfferClient:
-    """Offer service client fixture"""
-    return OfferClient(base_url=base_url, token=auth_token)
-
-
-@pytest.fixture
-def integration_client(base_url: str, auth_token: str | None) -> IntegrationClient:
-    """Integration service client fixture"""
-    return IntegrationClient(base_url=base_url, token=auth_token)
-
-
-# Helper function for parameterization (can be used in @pytest.mark.parametrize)
 def get_test_partner_ids() -> list[str]:
     """Get list of test partner IDs for parameterization"""
     return list(get_test_partners().values())

@@ -1,0 +1,4 @@
+# Add test PDFs here:
+# - valid_statement.pdf  (valid bank statement for positive tests)
+# - pw_statement.pdf     (password-protected PDF, password in S2O_TEST_PDF_PASSWORD)
+# - bank_statement.pdf   (alternative name for valid statement)

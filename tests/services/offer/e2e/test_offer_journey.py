@@ -1,17 +1,18 @@
 """
-Integration tests for Offer service API endpoints
+Integration tests for Offer End to End Journey
 """
 
 from typing import Any
 from uuid import UUID
-from framework.api.client import OfferClient
+from framework.api.clients.offer import OfferClient
 import pytest
 from tests.conftest import get_test_partner_ids
 
 
-@pytest.mark.integration
-class TestOfferAPI:
-    """Integration tests for offer API endpoints"""
+@pytest.mark.e2e
+@pytest.mark.offer
+class TestOfferJourney:
+    """Integration tests for Offer End to End Journey"""
 
     @pytest.mark.parametrize("partner_id", get_test_partner_ids())
     def test_offer_journey(self, offer_client: OfferClient, partner_id: str):
@@ -21,6 +22,9 @@ class TestOfferAPI:
 
         if not merchant_id:
             pytest.skip("No test merchant ID available")
+        
+        if not offer_id:
+            pytest.skip("No test offer ID available")
 
         # Get an Offer for a partner and merchant
         offer_details = self.get_offer_details(

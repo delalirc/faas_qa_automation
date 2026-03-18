@@ -10,6 +10,40 @@ This is the **centralized QA approach** where:
 - Services trigger tests during deployment pipelines via CircleCI Orb
 - Tests run in separate CircleCI pipeline
 
+## S2O (Statement-to-Offer) Testing
+
+Comprehensive QA for the S2O journey across **faas_s2o_orchestrator**, **faas_doc2data**, **faas_truid**, and **faas_spike**.
+
+- **Test Plan:** [docs/S2O_TEST_PLAN.md](docs/S2O_TEST_PLAN.md)
+- **Report Template:** [docs/S2O_TEST_REPORT_TEMPLATE.md](docs/S2O_TEST_REPORT_TEMPLATE.md)
+
+### Run S2O Tests
+
+```bash
+# Set UAT credentials
+export BASE_URL=https://uat.api.rcdevops.co.za
+export AUTH_TOKEN=<your-cognito-token>
+export TEST_PARTNER_ID=<partner-uuid>
+
+# Run all S2O tests
+pytest tests/s2o/ -v -m s2o
+
+# Run with JUnit XML (for report generation)
+pytest tests/s2o/ -v -m s2o --junitxml=reports/s2o_report.xml
+```
+
+### Generate S2O Test Report
+
+```bash
+pytest tests/s2o/ --junitxml=reports/s2o_report.xml -q
+python -m framework.utils.s2o_report_generator --junit-xml reports/s2o_report.xml --output reports/S2O_TEST_REPORT.md
+# Or: qa-s2o-report --junit-xml reports/s2o_report.xml
+```
+
+Add valid PDFs to `tests/s2o/assets/` for full E2E flows (see test plan).
+
+---
+
 ## Repository Structure
 
 ```

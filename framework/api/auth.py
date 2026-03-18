@@ -45,8 +45,7 @@ def _get_cognito_token() -> Optional[str]:
     client_secret = os.getenv("COGNITO_CLIENT_SECRET")
     scope = os.getenv("COGNITO_SCOPE")
     grant_type = "Client Credentials"
-    print(cognito_url, client_id, client_secret, scope, grant_type)
-
+    
     if not all([cognito_url, client_id, client_secret, scope, grant_type]):
         raise ValueError("Missing required Cognito configuration")
 

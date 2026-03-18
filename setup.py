@@ -33,6 +33,7 @@ setup(
             "qa-wait=scripts.wait_for_qa_tests:main",
             "qa-check=scripts.check_qa_results:main",
             "qa-report=framework.utils.reporting:main",
+            "qa-s2o-report=framework.utils.s2o_report_generator:main",
         ],
     },
 )
