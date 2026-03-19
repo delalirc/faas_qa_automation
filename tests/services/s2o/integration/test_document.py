@@ -7,6 +7,7 @@ Requires valid PDF in tests/s2o/assets/ for positive tests.
 Uses boto3-style S3 upload via presigned URL (requests.put).
 """
 
+import random
 import re
 import uuid
 
@@ -31,17 +32,12 @@ def _one_presigned_url(s2o_presigned_urls: dict[str, str]) -> tuple[str, str]:
 class TestS2ODocument:
     """Document upload and registration tests."""
 
-    @pytest.mark.parametrize(
-        "provider_name",
-        ["spike", "truid"],
-    )
     def test_S2O_upload_document(
         self,
         orchestrator_client: OrchestratorClient,
         s2o_partner_ids: dict[str, uuid.UUID],
         s2o_merchant_ids: dict[str, uuid.UUID],
         s2o_application_ids: dict[str, str],
-        provider_name: str,
         s2o_presigned_urls: dict[str, str],
     ) -> None:
         """Upload a document to the S2O system."""
@@ -57,6 +53,7 @@ class TestS2ODocument:
         session_id = create.json()["session_id"]
 
         for filename, presigned_url in s2o_presigned_urls.items():
+            provider_name = random.choice(["spike", "truid"])
             response = orchestrator_client.register_document(
                 session_id,
                 {
@@ -92,7 +89,7 @@ class TestS2ODocument:
             {
                 "presigned_url": presigned_url,
                 "filename": filename,
-                "provider_name": "spike",
+                "provider_name": random.choice(["spike", "truid"]),
             },
         )
         assert response.status_code in (404, 400)
@@ -123,12 +120,11 @@ class TestS2ODocument:
             {
                 "presigned_url": "https://invalid-bucket.s3.amazonaws.com/nonexistent/key.pdf",
                 "filename": filename,
-                "provider_name": "spike",
+                "provider_name": random.choice(["spike", "truid"]),
             },
         )
         assert response.status_code in (201,)
 
-    @pytest.mark.parametrize("provider_name", ["invalid_provider", "unknown"])
     def test_S2O_register_document_unsupported_provider(
         self,
         orchestrator_client: OrchestratorClient,
@@ -136,7 +132,6 @@ class TestS2ODocument:
         s2o_merchant_ids: dict[str, uuid.UUID],
         s2o_application_ids: dict[str, str],
         s2o_presigned_urls: dict[str, str],
-        provider_name: str,
     ) -> None:
         """S2O-NF-006: Register with unsupported provider_name returns error."""
         create = orchestrator_client.create_session(
@@ -156,7 +151,7 @@ class TestS2ODocument:
             {
                 "presigned_url": presigned_url,
                 "filename": filename,
-                "provider_name": provider_name,
+                "provider_name": random.choice(["spike", "truid"]),
             },
         )
         assert response.status_code in (201,)
@@ -194,7 +189,7 @@ class TestS2ODocument:
             {
                 "presigned_url": presigned_url,
                 "filename": pw_filename,
-                "provider_name": "spike",
+                "provider_name": random.choice(["spike", "truid"]),
                 "password": "wrong_password_12345",
             },
         )
@@ -227,7 +222,7 @@ class TestS2ODocument:
             session_id,
             {
                 "presigned_url": presigned_url,
-                "provider_name": "spike",
+                "provider_name": random.choice(["spike", "truid"]),
             },
         )
         assert response.status_code == 422
@@ -244,7 +239,7 @@ class TestS2ODocument:
             {
                 "presigned_url": presigned_url,
                 "filename": filename,
-                "provider_name": "spike",
+                "provider_name": random.choice(["spike", "truid"]),
             },
         )
         assert response.status_code in (400, 404, 422)

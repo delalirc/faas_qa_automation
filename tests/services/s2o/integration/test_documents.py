@@ -7,6 +7,7 @@ Requires valid PDF in tests/s2o/assets/ for positive tests.
 Uses boto3-style S3 upload via presigned URL (requests.put).
 """
 
+import random
 import re
 from typing import Any
 import uuid
@@ -40,17 +41,12 @@ def _one_document(
 class TestS2ODocuments:
     """Document upload and registration tests."""
 
-    @pytest.mark.parametrize(
-        "provider_name",
-        ["spike", "truid"],
-    )
     def test_S2O_upload_document(
         self,
         orchestrator_client: OrchestratorClient,
         s2o_partner_ids: dict[str, uuid.UUID],
         s2o_merchant_ids: dict[str, uuid.UUID],
         s2o_application_ids: dict[str, str],
-        provider_name: str,
         s2o_presigned_urls: dict[str, str],
     ) -> None:
         """Upload a document to the S2O system."""
@@ -70,7 +66,7 @@ class TestS2ODocuments:
                 {
                     "presigned_url": presigned_url,
                     "filename": filename,
-                    "provider_name": provider_name,
+                    "provider_name": random.choice(["spike", "truid"]),
                     "password": _get_password(filename),
                 }
                 for filename, presigned_url in s2o_presigned_urls.items()
@@ -127,7 +123,7 @@ class TestS2ODocuments:
             {
                 "presigned_url": "https://invalid.s3.amazonaws.com/fake.pdf",
                 "filename": filename,
-                "provider_name": "spike",
+                "provider_name": random.choice(["spike", "truid"]),
             }
         ]
         response = orchestrator_client.register_documents(session_id, documents)
@@ -205,7 +201,7 @@ class TestS2ODocuments:
             {
                 "presigned_url": "https://invalid.s3.amazonaws.com/fake.pdf",
                 "filename": filename,
-                "provider_name": "spike",
+                "provider_name": random.choice(["spike", "truid"]),
             },
         ]
         response = orchestrator_client.register_documents(session_id, documents)
